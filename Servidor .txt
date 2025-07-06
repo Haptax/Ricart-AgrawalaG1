@@ -1,0 +1,66 @@
+import socket
+import threading
+import time
+
+# Función para manejar las solicitudes de los clientes
+def manejar_solicitud(conn, addr):
+    try:
+        mensaje = conn.recv(1024).decode()  # Recibir mensaje del cliente
+        print(f"Solicitud recibida de {addr}: {mensaje}")
+
+        if mensaje.startswith("solicitud"):
+            # Procesar la solicitud y enviar una respuesta
+            cliente, timestamp = mensaje.split(":")[1].split(",")
+            print(f"Procesando solicitud de {cliente} con timestamp {timestamp}")
+            
+            # Enviar respuesta "OK" al cliente
+            conn.send("OK".encode())
+            print(f"Respuesta enviada a {addr}")
+
+        elif mensaje == "fin":
+            # Cerrando la conexión si el cliente indica que ha terminado
+            print(f"Cliente {addr} ha finalizado.")
+            conn.close()
+
+    except Exception as e:
+        print(f"Error al manejar la solicitud de {addr}: {e}")
+        conn.close()
+
+# Función para cerrar el servidor
+def cerrar_servidor(server_socket):
+    print("\nServidor apagado.")
+    server_socket.close()
+
+# Función del servidor que escucha en el puerto
+def servidor():
+    host = '0.0.0.0'  # Escuchar en todas las interfaces
+    puerto = 12345  # Puerto para escuchar
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((host, puerto))
+    server_socket.listen(5)
+    print(f"Servidor escuchando en puerto {puerto}")
+
+    # Hilo para aceptar conexiones
+    def aceptar_conexiones():
+        while True:
+            try:
+                conn, addr = server_socket.accept()
+                print(f"Conexión de {addr}")
+                threading.Thread(target=manejar_solicitud, args=(conn, addr)).start()
+            except Exception as e:
+                print(f"Error al aceptar conexión: {e}")
+                break
+
+    # Iniciar el hilo para aceptar conexiones
+    hilo_aceptar = threading.Thread(target=aceptar_conexiones)
+    hilo_aceptar.start()
+
+    # Escuchar comandos para detener el servidor
+    while True:
+        comando = input("Ingrese 'exit' o 'stop' para apagar el servidor: ").strip().lower()
+        if comando == "exit" or comando == "stop":
+            cerrar_servidor(server_socket)
+            break
+
+if __name__ == "__main__":
+    servidor()

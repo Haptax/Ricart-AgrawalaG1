@@ -1,0 +1,76 @@
+import socket
+import time
+import multiprocessing
+
+# Lista de servidores
+servidores = ["192.168.101.103"]  # Cambia esta IP por la del servidor
+puerto = 12345
+
+# Variable para almacenar las respuestas de todos los servidores
+respuestas = {}
+
+# Función para enviar solicitud de un cliente
+def enviar_solicitud(cliente_id, control_event):
+    global respuestas
+    
+    print(f"Cliente {cliente_id} iniciado.")
+    
+    for servidor_ip in servidores:
+        try:
+            # Conexión con el servidor
+            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            client_socket.connect((servidor_ip, puerto))
+            print(f"Conectando con servidor {servidor_ip}...")
+
+            # Enviar solicitud
+            timestamp = str(int(time.time()))  # Usamos timestamp como un identificador único
+            mensaje = f"solicitud:{cliente_id},{timestamp}"
+            client_socket.send(mensaje.encode())
+            
+            # Esperar la respuesta
+            respuesta = client_socket.recv(1024).decode()
+            respuestas[servidor_ip] = respuesta
+            print(f"Respuesta de {servidor_ip}: {respuesta}")
+
+            client_socket.close()
+
+        except Exception as e:
+            print(f"Error al conectar con el servidor {servidor_ip}: {e}")
+    
+    # Después de procesar todas las solicitudes, se accede a la sección crítica
+    print(f"Cliente {cliente_id}: Todas las respuestas recibidas, puede acceder a la sección crítica.")
+    time.sleep(2)  # Simulando trabajo en la sección crítica
+    print(f"Sección crítica finalizada por Cliente {cliente_id}.")
+    
+    # Indicar que este cliente ha terminado su trabajo
+    control_event.set()
+
+# Función del controlador que lanza los clientes
+def controlador():
+    while True:
+        num_clientes = int(input("\n¿Cuántos clientes deseas lanzar? Ingresa un número: "))
+        
+        control_event = multiprocessing.Event()  # Usamos un evento para sincronizar la finalización
+
+        # Crear y lanzar múltiples procesos de cliente
+        clientes = []
+        for i in range(1, num_clientes + 1):
+            p = multiprocessing.Process(target=enviar_solicitud, args=(f"Cliente_{i}", control_event))
+            clientes.append(p)
+            p.start()
+
+        # Esperar a que todos los clientes terminen
+        for p in clientes:
+            p.join()
+
+        print("Todos los clientes han terminado sus procesos.")
+        
+        # Preguntar si el usuario desea agregar más clientes
+        respuesta = input("¿Deseas agregar más clientes? (Presiona Enter para continuar, 'no' para terminar): ")
+        if respuesta.lower() == "no":
+            break
+
+# Función principal para ejecutar todo
+if __name__ == "__main__":
+    controlador()
+
